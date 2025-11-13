@@ -25,7 +25,8 @@ zebranych linii zaktualizują się automatycznie. Po każdej turze w panelu
 po prawej stronie zobaczysz podgląd kolejnego urządzenia, co pozwala lepiej
 planować ruchy.
 
-Po przegranej na ekranie pojawia się półprzezroczyste okno z przyciskiem,
-który pozwala szybko uruchomić kolejną rundę. W dolnym panelu gry znajdziesz
-także przycisk „Pauza”, dzięki któremu możesz zatrzymać akcję i wznowić ją
-jednym kliknięciem.
+Po przegranej lub w trakcie pauzy pojawia się półprzezroczyste okno z
+komunikatem. Kliknięcie komunikatu (lub wciśnięcie <kbd>Enter</kbd>) pozwala
+szybko wznowić rozgrywkę albo rozpocząć nową rundę. W dolnym panelu gry
+znajdziesz także przycisk „Pauza”, dzięki któremu możesz zatrzymać akcję i
+wznowić ją jednym kliknięciem.

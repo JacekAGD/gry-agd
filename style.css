@@ -204,6 +204,7 @@ body {
   backdrop-filter: blur(6px);
   z-index: 10;
   padding: 24px;
+  cursor: pointer;
 }
 
 .overlay__content {
@@ -216,6 +217,7 @@ body {
   gap: 16px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   box-shadow: 0 25px 60px rgba(15, 23, 42, 0.5);
+  cursor: inherit;
 }
 
 .overlay__content h2 {

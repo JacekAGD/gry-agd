@@ -164,7 +164,7 @@ const linesElement = document.querySelector("#lines");
 const previewElement = document.querySelector("#preview");
 const overlayElement = document.querySelector("#overlay");
 const overlayMessageElement = document.querySelector("#overlayMessage");
-const startButton = document.querySelector("#startButton");
+const overlayContent = document.querySelector(".overlay__content");
 const pauseButton = document.querySelector("#pauseButton");
 
 const grid = Array.from({ length: HEIGHT }, () =>
@@ -214,15 +214,18 @@ function resetGrid() {
   activePiece = null;
 }
 
-function showOverlay(message, buttonLabel) {
+function showOverlay(message) {
   overlayMessageElement.textContent = message;
-  startButton.textContent = buttonLabel;
   overlayElement.hidden = false;
-  const focusButton = () => startButton.focus({ preventScroll: true });
+  const focusTarget = () => {
+    if (overlayContent) {
+      overlayContent.focus({ preventScroll: true });
+    }
+  };
   if (typeof queueMicrotask === "function") {
-    queueMicrotask(focusButton);
+    queueMicrotask(focusTarget);
   } else {
-    setTimeout(focusButton, 0);
+    setTimeout(focusTarget, 0);
   }
 }
 
@@ -262,8 +265,7 @@ function pauseGame() {
   }
   pauseButton.textContent = "Wznów";
   showOverlay(
-    "Przerwa na kawę! Wróć do układania sprzętów, kiedy będziesz gotowy.",
-    "Wznów grę"
+    "Przerwa na kawę! Kliknij komunikat lub naciśnij Enter, aby wrócić do układania sprzętów."
   );
 }
 
@@ -305,11 +307,11 @@ function endGame() {
   drawBoard();
   const message =
     linesCleared === 0
-      ? `Koniec gry! Zdobyłeś ${score} pkt.`
+      ? `Koniec gry! Zdobyłeś ${score} pkt. Kliknij komunikat lub naciśnij Enter, aby zagrać ponownie.`
       : `Koniec gry! Zdobyłeś ${score} pkt i usunąłeś ${formatLinesCount(
           linesCleared
-        )}.`;
-  showOverlay(message, "Zagraj ponownie");
+        )}. Kliknij komunikat lub naciśnij Enter, aby zagrać ponownie.`;
+  showOverlay(message);
   pauseButton.textContent = "Pauza";
   pauseButton.disabled = true;
 }
@@ -574,7 +576,7 @@ function handleKeydown(event) {
 }
 
 document.addEventListener("keydown", handleKeydown);
-startButton.addEventListener("click", () => {
+overlayElement.addEventListener("click", () => {
   if (gameState === "idle" || gameState === "over") {
     startGame();
   } else if (gameState === "paused") {
