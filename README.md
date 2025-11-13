@@ -18,14 +18,14 @@ sterowana jest klawiszami strzałek oraz spacją.
 - <kbd>↓</kbd> – miękki zrzut przyśpieszający opad.
 - <kbd>Spacja</kbd> – twardy zrzut na dno planszy.
 - <kbd>P</kbd> / <kbd>Esc</kbd> – zatrzymanie i wznowienie gry.
-- <kbd>Enter</kbd> – rozpoczęcie rozgrywki lub wyjście z pauzy.
+- <kbd>Enter</kbd> – rozpoczęcie nowej rundy po przegranej lub wyjście z pauzy.
 
 Gdy wypełnisz całą linię, sprzęty zostaną zabrane, a wynik i licznik
 zebranych linii zaktualizują się automatycznie. Po każdej turze w panelu
 po prawej stronie zobaczysz podgląd kolejnego urządzenia, co pozwala lepiej
 planować ruchy.
 
-Na starcie i po każdej przegranej wyświetlane jest półprzezroczyste okno z
-przyciskiem „Start”, które pozwala rozpocząć nową rundę we własnym tempie.
-W dolnym panelu gry znajdziesz także przycisk „Pauza” umożliwiający szybkie
-zatrzymanie akcji podczas gry i wznowienie jej jednym kliknięciem.
+Po przegranej na ekranie pojawia się półprzezroczyste okno z przyciskiem,
+który pozwala szybko uruchomić kolejną rundę. W dolnym panelu gry znajdziesz
+także przycisk „Pauza”, dzięki któremu możesz zatrzymać akcję i wznowić ją
+jednym kliknięciem.

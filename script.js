@@ -588,7 +588,5 @@ pauseButton.addEventListener("click", () => {
 
 initBoard();
 initPreview();
-drawBoard();
-drawPreview();
 pauseButton.disabled = true;
-showOverlay("Naciśnij przycisk Start, aby rozpocząć grę.", "Start");
+startGame();
