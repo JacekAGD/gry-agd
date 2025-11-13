@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetris AGD</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="game">
+        <header class="game__header">
+          <h1>Tetris z AGD</h1>
+          <p>Ułóż spadające sprzęty RTV/AGD, zanim zapełnią całą kuchnię!</p>
+        </header>
+        <div class="game__board" id="board" aria-label="Plansza gry Tetris"></div>
+        <footer class="game__footer" aria-live="polite">
+          <div class="stat">
+            <span class="stat__label">Wynik</span>
+            <span class="stat__value" id="score">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Linie</span>
+            <span class="stat__value" id="lines">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Następny sprzęt</span>
+            <div class="preview" id="preview" aria-label="Podgląd następnego klocka"></div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn" id="pauseButton" disabled>Pauza</button>
+          </div>
+        </footer>
+      </section>
+      <aside class="panel">
+        <h2>Jak grać?</h2>
+        <ul>
+          <li><kbd>←</kbd> / <kbd>→</kbd> – przesuwanie sprzętu na boki</li>
+          <li><kbd>↑</kbd> – obrót urządzenia</li>
+          <li><kbd>↓</kbd> – szybszy opad</li>
+          <li><kbd>Spacja</kbd> – twardy zrzut na blat</li>
+        </ul>
+        <p>
+          Każdy klocek to inne urządzenie AGD: pralka, zmywarka czy blender. Gdy
+          wypełnisz cały rząd, ekipa sprzątająca zabiera linię sprzętów i robi
+          miejsce na kolejne dostawy.
+        </p>
+      </aside>
+    </main>
+    <section
+      class="overlay"
+      id="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Komunikat gry"
+      aria-describedby="overlayMessage"
+      hidden
+    >
+      <div class="overlay__content" tabindex="-1">
+        <p id="overlayMessage"></p>
+      </div>
+    </section>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
