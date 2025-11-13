@@ -1,19 +1,33 @@
-# AGD Repair Tycoon
+# AGD Repair Tycoon Online
 
-Prosty, tekstowy symulator prowadzenia serwisu pralek, zmywarek, kuchenek i lodówek.
-Zarządzaj energią, reputacją oraz pieniędzmi, kupuj ulepszenia i obsługuj codzienne
-zlecenia klientów.
+Przeglądarkowa, kooperacyjna gra ekonomiczna o prowadzeniu serwisu AGD. W każdej
+rozgrywce tworzysz warsztat naprawiający pralki, zmywarki, kuchenki i lodówki.
+Losuj zlecenia dnia, rozwiązuj scenariusze diagnostyczne w formie mini quizów,
+zarządzaj energią ekipy oraz inwestuj w ulepszenia zwiększające przychody.
 
-## Wymagania
+Wersja HTML5 działa w pełni po stronie klienta – stan gry zapisywany jest w
+`localStorage`, a tablica warsztatów synchronizuje się w czasie rzeczywistym
+między otwartymi kartami dzięki `BroadcastChannel`.
 
-* Python 3.10 lub nowszy
+## Uruchomienie lokalne
 
-## Uruchamianie
+1. Otwórz plik `web/index.html` w preferowanej przeglądarce lub
+2. Uruchom prosty serwer statyczny, aby uzyskać automatyczne odświeżanie:
 
 ```bash
-python -m agd_repair_tycoon.game
+python -m http.server 8000 --directory web
 ```
 
-Po uruchomieniu podaj imię serwisanta, a następnie wybieraj zlecenia i akcje
-dostępne każdego dnia. Celem jest zdobycie jak największej reputacji oraz
-utrzymanie dodatniego bilansu finansowego przez dziesięć dni.
+Następnie przejdź do `http://localhost:8000`.
+
+## Rozgrywka
+
+- Kliknij **„Rozpocznij dzień”**, aby wygenerować nowe zlecenia.
+- Przyjmuj interesujące sprawy i rozwiązuj je etapami (diagnoza, naprawa,
+  testy) wybierając odpowiedzi w quizach branżowych.
+- Każdy etap zużywa energię warsztatu – inwestuj w ulepszenia, by zwiększyć
+  liczbę równoległych zleceń, zmniejszyć koszty energii i podnieść reputację.
+- Tablica warsztatów wyświetla wyniki Twoje oraz innych graczy otwierających grę
+  w tej samej sieci/urządzeniu (działa w oparciu o BroadcastChannel).
+
+Powodzenia w rozbudowie własnego imperium serwisowego!
