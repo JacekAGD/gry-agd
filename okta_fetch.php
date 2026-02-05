@@ -17,6 +17,12 @@ $appUrl = 'https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557
 $apiUrl = 'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/27790/0/2025-11-14/2025-11-21/false/null';
 $outputFile = 'sirius_tasks_data.json';
 
+// Nagłówki jak z działającego ruchu przeglądarkowego.
+$origin = 'https://sirius-partner.beko.com';
+$referer = 'https://sirius-partner.beko.com/';
+$language = 'pl-PL';
+$ipAddress = '0.0.0.0'; // Opcjonalnie podmień na właściwy IP użytkownika.
+
 $cookieFile = tempnam(sys_get_temp_dir(), 'okta_cookie_');
 if ($cookieFile === false) {
     echo "Nie udało się utworzyć pliku cookies.\n";
@@ -47,7 +53,7 @@ function request(
         CURLOPT_CONNECTTIMEOUT => 30,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; okta-fetch-php/1.1)',
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HEADERFUNCTION => static function ($ch, $headerLine) use (&$responseHeaders) {
             $trimmed = trim($headerLine);
@@ -159,17 +165,48 @@ try {
         throw new RuntimeException('Błąd wejścia na aplikację Sirius. HTTP: ' . $appResponse['httpCode']);
     }
 
+    // 1) Preflight OPTIONS z nagłówkami jak w działającym ruchu.
+    $accessControlRequestHeaders = 'auth-userid,authorization,ipaddress,language,max-age,sessiontoken,sessiontokenws,x-frame-options,x-xss-protection';
+    $preflightHeaders = [
+        'Accept: */*',
+        'Origin: ' . $origin,
+        'Referer: ' . $referer,
+        'Sec-Fetch-Dest: empty',
+        'Sec-Fetch-Mode: cors',
+        'Sec-Fetch-Site: same-site',
+        'Access-Control-Request-Method: GET',
+        'Access-Control-Request-Headers: ' . $accessControlRequestHeaders,
+    ];
+    $preflight = request($apiUrl, $cookieFile, 'OPTIONS', null, $preflightHeaders, false);
+    if (!in_array($preflight['httpCode'], [200, 204], true)) {
+        throw new RuntimeException('Preflight OPTIONS nie przeszedł. HTTP: ' . $preflight['httpCode']);
+    }
+
+    // 2) GET z nagłówkami biznesowymi z przeglądarki.
+    $token = extractBearerCandidate([$authorizeResponse, $appResponse]);
     $apiHeaders = [
         'Accept: application/json, text/plain, */*',
-        'Referer: ' . $appResponse['url'],
+        'Origin: ' . $origin,
+        'Referer: ' . $referer,
+        'Language: ' . $language,
+        'IpAddress: ' . $ipAddress,
+        'Max-Age: 0',
+        'X-Frame-Options: SAMEORIGIN',
+        'X-XSS-Protection: 1; mode=block',
+        'Auth-UserId: ' . $login,
+        'SessionToken: ' . $sessionToken,
+        'SessionTokenWs: ' . $sessionToken,
     ];
-    $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders);
+    if ($token !== '') {
+        $apiHeaders[] = 'Authorization: Bearer ' . $token;
+    }
 
-    if ($apiResponse['httpCode'] === 401) {
-        $token = extractBearerCandidate([$authorizeResponse, $appResponse]);
+    $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders, false);
+    if ($apiResponse['httpCode'] === 401 && $token === '') {
+        $token = extractBearerCandidate([$authorizeResponse, $appResponse, $apiResponse]);
         if ($token !== '') {
             $apiHeaders[] = 'Authorization: Bearer ' . $token;
-            $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders);
+            $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders, false);
         }
     }
 
