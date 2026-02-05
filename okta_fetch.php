@@ -7,7 +7,7 @@ $login = 'YOUR_LOGIN';
 $pass = 'YOUR_PASSWORD';
 
 if ($login === 'YOUR_LOGIN' || $pass === 'YOUR_PASSWORD') {
-    fwrite(STDERR, "Uzupełnij zmienne login i pass w pliku okta_fetch.php\n");
+    echo "Uzupełnij zmienne login i pass w pliku okta_fetch.php\n";
     exit(1);
 }
 
@@ -98,12 +98,12 @@ PY;
 
 $tmpPy = tempnam(sys_get_temp_dir(), 'okta_playwright_');
 if ($tmpPy === false) {
-    fwrite(STDERR, "Nie udało się utworzyć pliku tymczasowego.\n");
+    echo "Nie udało się utworzyć pliku tymczasowego.\n";
     exit(1);
 }
 
 if (file_put_contents($tmpPy, $python) === false) {
-    fwrite(STDERR, "Nie udało się zapisać skryptu pomocniczego Python.\n");
+    echo "Nie udało się zapisać skryptu pomocniczego Python.\n";
     @unlink($tmpPy);
     exit(1);
 }
@@ -125,7 +125,7 @@ $env = array_merge($_ENV, [
 
 $process = proc_open($cmd, $descriptors, $pipes, null, $env);
 if (!is_resource($process)) {
-    fwrite(STDERR, "Nie udało się uruchomić Pythona.\n");
+    echo "Nie udało się uruchomić Pythona.\n";
     @unlink($tmpPy);
     exit(1);
 }
@@ -140,9 +140,9 @@ $exitCode = proc_close($process);
 @unlink($tmpPy);
 
 if ($exitCode !== 0) {
-    fwrite(STDERR, "Błąd podczas automatyzacji logowania/pobierania danych.\n");
+    echo "Błąd podczas automatyzacji logowania/pobierania danych.\n";
     if ($stderr !== '') {
-        fwrite(STDERR, $stderr);
+        echo $stderr;
     }
     exit($exitCode);
 }
