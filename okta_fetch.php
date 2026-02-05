@@ -12,7 +12,8 @@ if ($login === 'YOUR_LOGIN' || $pass === 'YOUR_PASSWORD') {
 }
 
 $authorizeUrl = 'https://arcelik.okta-emea.com/oauth2/v1/authorize?client_id=okta.2b1959c8-bcc0-56eb-a589-cfcfb7422f26&code_challenge=PgpvH9uwEFyESRTVT_Z-F_kNXWsSBz8mdmP0hyk6RGY&code_challenge_method=S256&nonce=57cRjuEV5z48yL08QoutsjdMrHTuHUQxtFptaW9SAnH3746EkCiE2o275MjsNIcl&redirect_uri=https%3A%2F%2Farcelik.okta-emea.com%2Fenduser%2Fcallback&response_type=code&state=CTMr1LoHzERaECK8izTFb0YvFWvsBfGNWSsajxFWuyXAaNYfKsTxfBhDQ26RE7vG&scope=openid%20profile%20email%20okta.users.read.self%20okta.users.manage.self%20okta.internal.enduser.read%20okta.internal.enduser.manage%20okta.enduser.dashboard.read%20okta.enduser.dashboard.manage%20okta.myAccount.sessions.manage%20okta.internal.navigation.enduser.read';
-$outputFile = 'okta_page.html';
+$apiUrl = 'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/27790/0/2025-11-14/2025-11-21/false/null';
+$outputFile = 'sirius_tasks_data.json';
 
 $python = <<<'PY'
 import os
@@ -22,6 +23,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 login = os.environ["OKTA_LOGIN"]
 password = os.environ["OKTA_PASS"]
 authorize_url = os.environ["OKTA_AUTHORIZE_URL"]
+api_url = os.environ["SIRIUS_API_URL"]
 output_file = os.environ["OKTA_OUTPUT_FILE"]
 
 with sync_playwright() as p:
@@ -80,14 +82,18 @@ with sync_playwright() as p:
     except PlaywrightTimeoutError:
         pass
 
-    html = page.content()
+    # Pobranie danych API po zalogowaniu i przejściu do aplikacji.
+    api_response = context.request.get(api_url, timeout=60000)
+    if not api_response.ok:
+        raise RuntimeError(f"Błąd pobierania API: HTTP {api_response.status}")
+
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(api_response.text())
 
     context.close()
     browser.close()
 
-print(f"Zapisano treść strony do: {output_file}")
+print(f"Zapisano dane API do: {output_file}")
 PY;
 
 $tmpPy = tempnam(sys_get_temp_dir(), 'okta_playwright_');
@@ -113,6 +119,7 @@ $env = array_merge($_ENV, [
     'OKTA_LOGIN' => $login,
     'OKTA_PASS' => $pass,
     'OKTA_AUTHORIZE_URL' => $authorizeUrl,
+    'SIRIUS_API_URL' => $apiUrl,
     'OKTA_OUTPUT_FILE' => $outputFile,
 ]);
 
@@ -133,7 +140,7 @@ $exitCode = proc_close($process);
 @unlink($tmpPy);
 
 if ($exitCode !== 0) {
-    fwrite(STDERR, "Błąd podczas automatyzacji logowania.\n");
+    fwrite(STDERR, "Błąd podczas automatyzacji logowania/pobierania danych.\n");
     if ($stderr !== '') {
         fwrite(STDERR, $stderr);
     }
