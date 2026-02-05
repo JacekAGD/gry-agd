@@ -17,11 +17,10 @@ $appUrl = 'https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557
 $apiUrl = 'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/27790/0/2025-11-14/2025-11-21/false/null';
 $outputFile = 'sirius_tasks_data.json';
 
-// Nagłówki jak z działającego ruchu przeglądarkowego.
 $origin = 'https://sirius-partner.beko.com';
 $referer = 'https://sirius-partner.beko.com/';
 $language = 'pl-PL';
-$ipAddress = '0.0.0.0'; // Opcjonalnie podmień na właściwy IP użytkownika.
+$ipAddress = '0.0.0.0';
 
 $cookieFile = tempnam(sys_get_temp_dir(), 'okta_cookie_');
 if ($cookieFile === false) {
@@ -29,14 +28,8 @@ if ($cookieFile === false) {
     exit(1);
 }
 
-function request(
-    string $url,
-    string $cookieFile,
-    string $method = 'GET',
-    ?string $body = null,
-    array $headers = [],
-    bool $follow = true
-): array {
+function request(string $url, string $cookieFile, string $method = 'GET', ?string $body = null, array $headers = [], bool $follow = true): array
+{
     $responseHeaders = [];
 
     $ch = curl_init($url);
@@ -60,7 +53,6 @@ function request(
             if ($trimmed !== '') {
                 $responseHeaders[] = $trimmed;
             }
-
             return strlen($headerLine);
         },
     ]);
@@ -68,7 +60,6 @@ function request(
     if ($headers !== []) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     }
-
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     }
@@ -84,12 +75,7 @@ function request(
     $effectiveUrl = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
     curl_close($ch);
 
-    return [
-        'httpCode' => $httpCode,
-        'body' => $response,
-        'url' => $effectiveUrl,
-        'headers' => $responseHeaders,
-    ];
+    return ['httpCode' => $httpCode, 'body' => $response, 'url' => $effectiveUrl, 'headers' => $responseHeaders];
 }
 
 function extractBearerCandidate(array $responses): string
@@ -104,13 +90,42 @@ function extractBearerCandidate(array $responses): string
     foreach ($responses as $response) {
         $url = $response['url'] ?? '';
         $body = $response['body'] ?? '';
-
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $url, $m) === 1) {
                 return rawurldecode((string) $m[1]);
             }
             if (preg_match($pattern, $body, $m) === 1) {
                 return rawurldecode((string) $m[1]);
+            }
+        }
+    }
+
+    return '';
+}
+
+function extractHeaderValueCandidate(string $name, array $responses): string
+{
+    $name = preg_quote($name, '/');
+    $patterns = [
+        '/"' . $name . '"\s*:\s*"([^"]+)"/i',
+        '/\b' . $name . '\b\s*[:=]\s*"?([^",\s}]+)/i',
+        '/\b' . $name . '=([^;\s]+)/i',
+    ];
+
+    foreach ($responses as $response) {
+        foreach ([$response['url'] ?? '', $response['body'] ?? ''] as $source) {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $source, $m) === 1) {
+                    return rawurldecode((string) $m[1]);
+                }
+            }
+        }
+
+        foreach (($response['headers'] ?? []) as $headerLine) {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $headerLine, $m) === 1) {
+                    return rawurldecode((string) $m[1]);
+                }
             }
         }
     }
@@ -132,15 +147,7 @@ try {
         throw new RuntimeException('Nie udało się zbudować payload JSON.');
     }
 
-    $auth = request(
-        $baseUrl . '/api/v1/authn',
-        $cookieFile,
-        'POST',
-        $payload,
-        ['Accept: application/json', 'Content-Type: application/json'],
-        false
-    );
-
+    $auth = request($baseUrl . '/api/v1/authn', $cookieFile, 'POST', $payload, ['Accept: application/json', 'Content-Type: application/json'], false);
     $authJson = json_decode($auth['body'], true);
     if (!is_array($authJson)) {
         throw new RuntimeException('Niepoprawna odpowiedź JSON z /api/v1/authn.');
@@ -165,7 +172,6 @@ try {
         throw new RuntimeException('Błąd wejścia na aplikację Sirius. HTTP: ' . $appResponse['httpCode']);
     }
 
-    // 1) Preflight OPTIONS z nagłówkami jak w działającym ruchu.
     $accessControlRequestHeaders = 'auth-userid,authorization,ipaddress,language,max-age,sessiontoken,sessiontokenws,x-frame-options,x-xss-protection';
     $preflightHeaders = [
         'Accept: */*',
@@ -182,8 +188,24 @@ try {
         throw new RuntimeException('Preflight OPTIONS nie przeszedł. HTTP: ' . $preflight['httpCode']);
     }
 
-    // 2) GET z nagłówkami biznesowymi z przeglądarki.
     $token = extractBearerCandidate([$authorizeResponse, $appResponse]);
+
+    // W praktyce Sirius zwykle wymaga tokenów specyficznych dla aplikacji,
+    // nie surowego sessionToken z Okta. Próbujemy je wydobyć z odpowiedzi appki.
+    $sessionTokenWs = extractHeaderValueCandidate('sessiontokenws', [$appResponse, $authorizeResponse]);
+    $sessionTokenApi = extractHeaderValueCandidate('sessiontoken', [$appResponse, $authorizeResponse]);
+    $authUserId = extractHeaderValueCandidate('auth-userid', [$appResponse, $authorizeResponse]);
+
+    if ($sessionTokenWs === '') {
+        $sessionTokenWs = $sessionToken;
+    }
+    if ($sessionTokenApi === '') {
+        $sessionTokenApi = $sessionToken;
+    }
+    if ($authUserId === '') {
+        $authUserId = $login;
+    }
+
     $apiHeaders = [
         'Accept: application/json, text/plain, */*',
         'Origin: ' . $origin,
@@ -193,9 +215,9 @@ try {
         'Max-Age: 0',
         'X-Frame-Options: SAMEORIGIN',
         'X-XSS-Protection: 1; mode=block',
-        'Auth-UserId: ' . $login,
-        'SessionToken: ' . $sessionToken,
-        'SessionTokenWs: ' . $sessionToken,
+        'Auth-UserId: ' . $authUserId,
+        'SessionToken: ' . $sessionTokenApi,
+        'SessionTokenWs: ' . $sessionTokenWs,
     ];
     if ($token !== '') {
         $apiHeaders[] = 'Authorization: Bearer ' . $token;
@@ -214,6 +236,8 @@ try {
         throw new RuntimeException(
             'Błąd pobierania API. HTTP: ' . $apiResponse['httpCode']
             . '. Final app URL: ' . $appResponse['url']
+            . '. Użyte Auth-UserId: ' . $authUserId
+            . '. SessionTokenWs length: ' . strlen($sessionTokenWs)
         );
     }
 
