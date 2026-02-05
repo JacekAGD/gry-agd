@@ -31,6 +31,8 @@ function request(
     array $headers = [],
     bool $follow = true
 ): array {
+    $responseHeaders = [];
+
     $ch = curl_init($url);
     if ($ch === false) {
         throw new RuntimeException('Nie udało się zainicjalizować cURL.');
@@ -45,8 +47,16 @@ function request(
         CURLOPT_CONNECTTIMEOUT => 30,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; okta-fetch-php/1.0)',
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; okta-fetch-php/1.1)',
         CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_HEADERFUNCTION => static function ($ch, $headerLine) use (&$responseHeaders) {
+            $trimmed = trim($headerLine);
+            if ($trimmed !== '') {
+                $responseHeaders[] = $trimmed;
+            }
+
+            return strlen($headerLine);
+        },
     ]);
 
     if ($headers !== []) {
@@ -72,11 +82,37 @@ function request(
         'httpCode' => $httpCode,
         'body' => $response,
         'url' => $effectiveUrl,
+        'headers' => $responseHeaders,
     ];
 }
 
+function extractBearerCandidate(array $responses): string
+{
+    $patterns = [
+        '/"access_token"\s*:\s*"([^"]+)"/i',
+        '/"id_token"\s*:\s*"([^"]+)"/i',
+        '/access_token=([^&"\s]+)/i',
+        '/id_token=([^&"\s]+)/i',
+    ];
+
+    foreach ($responses as $response) {
+        $url = $response['url'] ?? '';
+        $body = $response['body'] ?? '';
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $url, $m) === 1) {
+                return rawurldecode((string) $m[1]);
+            }
+            if (preg_match($pattern, $body, $m) === 1) {
+                return rawurldecode((string) $m[1]);
+            }
+        }
+    }
+
+    return '';
+}
+
 try {
-    // 1) Authn -> sessionToken
     $payload = json_encode([
         'username' => $login,
         'password' => $pass,
@@ -110,7 +146,6 @@ try {
         throw new RuntimeException("Nie udało się pobrać sessionToken. HTTP: {$auth['httpCode']}, status: {$status}");
     }
 
-    // 2) Wejście przez authorize z sessionToken (ustanawia sesję Okta)
     $separator = str_contains($authorizeUrl, '?') ? '&' : '?';
     $authorizeWithToken = $authorizeUrl . $separator . 'sessionToken=' . rawurlencode((string) $sessionToken);
 
@@ -119,16 +154,30 @@ try {
         throw new RuntimeException('Błąd wejścia na authorize URL. HTTP: ' . $authorizeResponse['httpCode']);
     }
 
-    // 3) Wejście na kafelek aplikacji Sirius
     $appResponse = request($appUrl, $cookieFile, 'GET');
     if ($appResponse['httpCode'] >= 400) {
         throw new RuntimeException('Błąd wejścia na aplikację Sirius. HTTP: ' . $appResponse['httpCode']);
     }
 
-    // 4) Pobranie API już na aktywnej sesji/cookies
-    $apiResponse = request($apiUrl, $cookieFile, 'GET');
+    $apiHeaders = [
+        'Accept: application/json, text/plain, */*',
+        'Referer: ' . $appResponse['url'],
+    ];
+    $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders);
+
+    if ($apiResponse['httpCode'] === 401) {
+        $token = extractBearerCandidate([$authorizeResponse, $appResponse]);
+        if ($token !== '') {
+            $apiHeaders[] = 'Authorization: Bearer ' . $token;
+            $apiResponse = request($apiUrl, $cookieFile, 'GET', null, $apiHeaders);
+        }
+    }
+
     if ($apiResponse['httpCode'] >= 400) {
-        throw new RuntimeException('Błąd pobierania API. HTTP: ' . $apiResponse['httpCode']);
+        throw new RuntimeException(
+            'Błąd pobierania API. HTTP: ' . $apiResponse['httpCode']
+            . '. Final app URL: ' . $appResponse['url']
+        );
     }
 
     if (file_put_contents($outputFile, $apiResponse['body']) === false) {
