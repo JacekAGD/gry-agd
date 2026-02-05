@@ -11,142 +11,135 @@ if ($login === 'YOUR_LOGIN' || $pass === 'YOUR_PASSWORD') {
     exit(1);
 }
 
+$baseUrl = 'https://arcelik.okta-emea.com';
 $authorizeUrl = 'https://arcelik.okta-emea.com/oauth2/v1/authorize?client_id=okta.2b1959c8-bcc0-56eb-a589-cfcfb7422f26&code_challenge=PgpvH9uwEFyESRTVT_Z-F_kNXWsSBz8mdmP0hyk6RGY&code_challenge_method=S256&nonce=57cRjuEV5z48yL08QoutsjdMrHTuHUQxtFptaW9SAnH3746EkCiE2o275MjsNIcl&redirect_uri=https%3A%2F%2Farcelik.okta-emea.com%2Fenduser%2Fcallback&response_type=code&state=CTMr1LoHzERaECK8izTFb0YvFWvsBfGNWSsajxFWuyXAaNYfKsTxfBhDQ26RE7vG&scope=openid%20profile%20email%20okta.users.read.self%20okta.users.manage.self%20okta.internal.enduser.read%20okta.internal.enduser.manage%20okta.enduser.dashboard.read%20okta.enduser.dashboard.manage%20okta.myAccount.sessions.manage%20okta.internal.navigation.enduser.read';
+$appUrl = 'https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557';
 $apiUrl = 'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/27790/0/2025-11-14/2025-11-21/false/null';
 $outputFile = 'sirius_tasks_data.json';
 
-$python = <<<'PY'
-import os
-import sys
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-
-login = os.environ["OKTA_LOGIN"]
-password = os.environ["OKTA_PASS"]
-authorize_url = os.environ["OKTA_AUTHORIZE_URL"]
-api_url = os.environ["SIRIUS_API_URL"]
-output_file = os.environ["OKTA_OUTPUT_FILE"]
-
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    context = browser.new_context()
-    page = context.new_page()
-
-    page.goto(authorize_url, wait_until="domcontentloaded", timeout=120000)
-
-    # Pola logowania wskazane przez użytkownika.
-    page.fill('input[name="identifier"]', login)
-    page.fill('input[name="credentials.passcode"]', password)
-
-    # Kliknięcie przycisku logowania.
-    submit_selectors = [
-        'input[type="submit"]',
-        'button[type="submit"]',
-        '#okta-signin-submit',
-        'input[data-type="save"]',
-        'button[data-type="save"]',
-    ]
-
-    submitted = False
-    for selector in submit_selectors:
-        locator = page.locator(selector)
-        if locator.count() > 0:
-            locator.first.click()
-            submitted = True
-            break
-
-    if not submitted:
-        raise RuntimeError("Nie znaleziono przycisku logowania.")
-
-    try:
-        page.wait_for_load_state("networkidle", timeout=30000)
-    except PlaywrightTimeoutError:
-        pass
-
-    # Kliknięcie karty aplikacji: Sirius Partner - Beko.
-    app_selector = 'a[data-se="app-card"][href="https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557"]'
-    app_link = page.locator(app_selector)
-
-    if app_link.count() == 0:
-        app_link = page.get_by_role("link", name="uruchom aplikację Sirius Partner - Beko")
-
-    if app_link.count() == 0:
-        app_link = page.locator('a[data-se="app-card"]:has-text("Sirius Partner - Beko")')
-
-    if app_link.count() == 0:
-        raise RuntimeError("Nie znaleziono kafelka aplikacji Sirius Partner - Beko.")
-
-    app_link.first.click()
-
-    try:
-        page.wait_for_load_state("networkidle", timeout=45000)
-    except PlaywrightTimeoutError:
-        pass
-
-    # Pobranie danych API po zalogowaniu i przejściu do aplikacji.
-    api_response = context.request.get(api_url, timeout=60000)
-    if not api_response.ok:
-        raise RuntimeError(f"Błąd pobierania API: HTTP {api_response.status}")
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(api_response.text())
-
-    context.close()
-    browser.close()
-
-print(f"Zapisano dane API do: {output_file}")
-PY;
-
-$tmpPy = tempnam(sys_get_temp_dir(), 'okta_playwright_');
-if ($tmpPy === false) {
-    echo "Nie udało się utworzyć pliku tymczasowego.\n";
+$cookieFile = tempnam(sys_get_temp_dir(), 'okta_cookie_');
+if ($cookieFile === false) {
+    echo "Nie udało się utworzyć pliku cookies.\n";
     exit(1);
 }
 
-if (file_put_contents($tmpPy, $python) === false) {
-    echo "Nie udało się zapisać skryptu pomocniczego Python.\n";
-    @unlink($tmpPy);
-    exit(1);
-}
-
-$cmd = 'python3 ' . escapeshellarg($tmpPy);
-$descriptors = [
-    0 => ['pipe', 'r'],
-    1 => ['pipe', 'w'],
-    2 => ['pipe', 'w'],
-];
-
-$env = array_merge($_ENV, [
-    'OKTA_LOGIN' => $login,
-    'OKTA_PASS' => $pass,
-    'OKTA_AUTHORIZE_URL' => $authorizeUrl,
-    'SIRIUS_API_URL' => $apiUrl,
-    'OKTA_OUTPUT_FILE' => $outputFile,
-]);
-
-$process = proc_open($cmd, $descriptors, $pipes, null, $env);
-if (!is_resource($process)) {
-    echo "Nie udało się uruchomić Pythona.\n";
-    @unlink($tmpPy);
-    exit(1);
-}
-
-fclose($pipes[0]);
-$stdout = stream_get_contents($pipes[1]);
-$stderr = stream_get_contents($pipes[2]);
-fclose($pipes[1]);
-fclose($pipes[2]);
-
-$exitCode = proc_close($process);
-@unlink($tmpPy);
-
-if ($exitCode !== 0) {
-    echo "Błąd podczas automatyzacji logowania/pobierania danych.\n";
-    if ($stderr !== '') {
-        echo $stderr;
+function request(
+    string $url,
+    string $cookieFile,
+    string $method = 'GET',
+    ?string $body = null,
+    array $headers = [],
+    bool $follow = true
+): array {
+    $ch = curl_init($url);
+    if ($ch === false) {
+        throw new RuntimeException('Nie udało się zainicjalizować cURL.');
     }
-    exit($exitCode);
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => $follow,
+        CURLOPT_COOKIEJAR => $cookieFile,
+        CURLOPT_COOKIEFILE => $cookieFile,
+        CURLOPT_TIMEOUT => 120,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; okta-fetch-php/1.0)',
+        CURLOPT_CUSTOMREQUEST => $method,
+    ]);
+
+    if ($headers !== []) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+
+    if ($body !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    }
+
+    $response = curl_exec($ch);
+    if ($response === false) {
+        $error = curl_error($ch);
+        curl_close($ch);
+        throw new RuntimeException('Błąd cURL: ' . $error);
+    }
+
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $effectiveUrl = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+    curl_close($ch);
+
+    return [
+        'httpCode' => $httpCode,
+        'body' => $response,
+        'url' => $effectiveUrl,
+    ];
 }
 
-if ($stdout !== '') {
-    echo $stdout;
+try {
+    // 1) Authn -> sessionToken
+    $payload = json_encode([
+        'username' => $login,
+        'password' => $pass,
+        'options' => [
+            'warnBeforePasswordExpired' => true,
+            'multiOptionalFactorEnroll' => false,
+        ],
+    ], JSON_UNESCAPED_SLASHES);
+
+    if ($payload === false) {
+        throw new RuntimeException('Nie udało się zbudować payload JSON.');
+    }
+
+    $auth = request(
+        $baseUrl . '/api/v1/authn',
+        $cookieFile,
+        'POST',
+        $payload,
+        ['Accept: application/json', 'Content-Type: application/json'],
+        false
+    );
+
+    $authJson = json_decode($auth['body'], true);
+    if (!is_array($authJson)) {
+        throw new RuntimeException('Niepoprawna odpowiedź JSON z /api/v1/authn.');
+    }
+
+    $sessionToken = $authJson['sessionToken'] ?? '';
+    if ($auth['httpCode'] >= 400 || $sessionToken === '') {
+        $status = $authJson['status'] ?? 'unknown';
+        throw new RuntimeException("Nie udało się pobrać sessionToken. HTTP: {$auth['httpCode']}, status: {$status}");
+    }
+
+    // 2) Wejście przez authorize z sessionToken (ustanawia sesję Okta)
+    $separator = str_contains($authorizeUrl, '?') ? '&' : '?';
+    $authorizeWithToken = $authorizeUrl . $separator . 'sessionToken=' . rawurlencode((string) $sessionToken);
+
+    $authorizeResponse = request($authorizeWithToken, $cookieFile, 'GET');
+    if ($authorizeResponse['httpCode'] >= 400) {
+        throw new RuntimeException('Błąd wejścia na authorize URL. HTTP: ' . $authorizeResponse['httpCode']);
+    }
+
+    // 3) Wejście na kafelek aplikacji Sirius
+    $appResponse = request($appUrl, $cookieFile, 'GET');
+    if ($appResponse['httpCode'] >= 400) {
+        throw new RuntimeException('Błąd wejścia na aplikację Sirius. HTTP: ' . $appResponse['httpCode']);
+    }
+
+    // 4) Pobranie API już na aktywnej sesji/cookies
+    $apiResponse = request($apiUrl, $cookieFile, 'GET');
+    if ($apiResponse['httpCode'] >= 400) {
+        throw new RuntimeException('Błąd pobierania API. HTTP: ' . $apiResponse['httpCode']);
+    }
+
+    if (file_put_contents($outputFile, $apiResponse['body']) === false) {
+        throw new RuntimeException('Nie udało się zapisać pliku wyjściowego.');
+    }
+
+    echo "Zapisano dane API do: {$outputFile}\n";
+} catch (Throwable $e) {
+    echo 'Błąd podczas automatyzacji logowania/pobierania danych: ' . $e->getMessage() . "\n";
+    @unlink($cookieFile);
+    exit(1);
 }
+
+@unlink($cookieFile);
