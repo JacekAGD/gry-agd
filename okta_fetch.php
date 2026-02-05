@@ -11,97 +11,135 @@ if ($login === 'YOUR_LOGIN' || $pass === 'YOUR_PASSWORD') {
     exit(1);
 }
 
-$baseUrl = 'https://arcelik.okta-emea.com';
 $authorizeUrl = 'https://arcelik.okta-emea.com/oauth2/v1/authorize?client_id=okta.2b1959c8-bcc0-56eb-a589-cfcfb7422f26&code_challenge=PgpvH9uwEFyESRTVT_Z-F_kNXWsSBz8mdmP0hyk6RGY&code_challenge_method=S256&nonce=57cRjuEV5z48yL08QoutsjdMrHTuHUQxtFptaW9SAnH3746EkCiE2o275MjsNIcl&redirect_uri=https%3A%2F%2Farcelik.okta-emea.com%2Fenduser%2Fcallback&response_type=code&state=CTMr1LoHzERaECK8izTFb0YvFWvsBfGNWSsajxFWuyXAaNYfKsTxfBhDQ26RE7vG&scope=openid%20profile%20email%20okta.users.read.self%20okta.users.manage.self%20okta.internal.enduser.read%20okta.internal.enduser.manage%20okta.enduser.dashboard.read%20okta.enduser.dashboard.manage%20okta.myAccount.sessions.manage%20okta.internal.navigation.enduser.read';
+$outputFile = 'okta_page.html';
 
-$payload = json_encode([
-    'username' => $login,
-    'password' => $pass,
-    'options' => [
-        'warnBeforePasswordExpired' => true,
-        'multiOptionalFactorEnroll' => false,
-    ],
-], JSON_UNESCAPED_SLASHES);
+$python = <<<'PY'
+import os
+import sys
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-if ($payload === false) {
-    fwrite(STDERR, "Nie udało się zbudować payload JSON.\n");
+login = os.environ["OKTA_LOGIN"]
+password = os.environ["OKTA_PASS"]
+authorize_url = os.environ["OKTA_AUTHORIZE_URL"]
+output_file = os.environ["OKTA_OUTPUT_FILE"]
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    context = browser.new_context()
+    page = context.new_page()
+
+    page.goto(authorize_url, wait_until="domcontentloaded", timeout=120000)
+
+    # Pola logowania wskazane przez użytkownika.
+    page.fill('input[name="identifier"]', login)
+    page.fill('input[name="credentials.passcode"]', password)
+
+    # Kliknięcie przycisku logowania.
+    submit_selectors = [
+        'input[type="submit"]',
+        'button[type="submit"]',
+        '#okta-signin-submit',
+        'input[data-type="save"]',
+        'button[data-type="save"]',
+    ]
+
+    submitted = False
+    for selector in submit_selectors:
+        locator = page.locator(selector)
+        if locator.count() > 0:
+            locator.first.click()
+            submitted = True
+            break
+
+    if not submitted:
+        raise RuntimeError("Nie znaleziono przycisku logowania.")
+
+    try:
+        page.wait_for_load_state("networkidle", timeout=30000)
+    except PlaywrightTimeoutError:
+        pass
+
+    # Kliknięcie karty aplikacji: Sirius Partner - Beko.
+    app_selector = 'a[data-se="app-card"][href="https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557"]'
+    app_link = page.locator(app_selector)
+
+    if app_link.count() == 0:
+        app_link = page.get_by_role("link", name="uruchom aplikację Sirius Partner - Beko")
+
+    if app_link.count() == 0:
+        app_link = page.locator('a[data-se="app-card"]:has-text("Sirius Partner - Beko")')
+
+    if app_link.count() == 0:
+        raise RuntimeError("Nie znaleziono kafelka aplikacji Sirius Partner - Beko.")
+
+    app_link.first.click()
+
+    try:
+        page.wait_for_load_state("networkidle", timeout=45000)
+    except PlaywrightTimeoutError:
+        pass
+
+    html = page.content()
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    context.close()
+    browser.close()
+
+print(f"Zapisano treść strony do: {output_file}")
+PY;
+
+$tmpPy = tempnam(sys_get_temp_dir(), 'okta_playwright_');
+if ($tmpPy === false) {
+    fwrite(STDERR, "Nie udało się utworzyć pliku tymczasowego.\n");
     exit(1);
 }
 
-$authCh = curl_init($baseUrl . '/api/v1/authn');
-if ($authCh === false) {
-    fwrite(STDERR, "Nie udało się zainicjalizować połączenia cURL dla authn.\n");
+if (file_put_contents($tmpPy, $python) === false) {
+    fwrite(STDERR, "Nie udało się zapisać skryptu pomocniczego Python.\n");
+    @unlink($tmpPy);
     exit(1);
 }
 
-curl_setopt_array($authCh, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-        'Accept: application/json',
-        'Content-Type: application/json',
-    ],
-    CURLOPT_POSTFIELDS => $payload,
+$cmd = 'python3 ' . escapeshellarg($tmpPy);
+$descriptors = [
+    0 => ['pipe', 'r'],
+    1 => ['pipe', 'w'],
+    2 => ['pipe', 'w'],
+];
+
+$env = array_merge($_ENV, [
+    'OKTA_LOGIN' => $login,
+    'OKTA_PASS' => $pass,
+    'OKTA_AUTHORIZE_URL' => $authorizeUrl,
+    'OKTA_OUTPUT_FILE' => $outputFile,
 ]);
 
-$authResponse = curl_exec($authCh);
-if ($authResponse === false) {
-    fwrite(STDERR, 'Błąd cURL (authn): ' . curl_error($authCh) . "\n");
-    curl_close($authCh);
+$process = proc_open($cmd, $descriptors, $pipes, null, $env);
+if (!is_resource($process)) {
+    fwrite(STDERR, "Nie udało się uruchomić Pythona.\n");
+    @unlink($tmpPy);
     exit(1);
 }
 
-$authHttpCode = curl_getinfo($authCh, CURLINFO_RESPONSE_CODE);
-curl_close($authCh);
+fclose($pipes[0]);
+$stdout = stream_get_contents($pipes[1]);
+$stderr = stream_get_contents($pipes[2]);
+fclose($pipes[1]);
+fclose($pipes[2]);
 
-$authJson = json_decode($authResponse, true);
-if (!is_array($authJson)) {
-    fwrite(STDERR, "Niepoprawna odpowiedź JSON z /api/v1/authn.\n");
-    fwrite(STDERR, $authResponse . "\n");
-    exit(1);
+$exitCode = proc_close($process);
+@unlink($tmpPy);
+
+if ($exitCode !== 0) {
+    fwrite(STDERR, "Błąd podczas automatyzacji logowania.\n");
+    if ($stderr !== '') {
+        fwrite(STDERR, $stderr);
+    }
+    exit($exitCode);
 }
 
-$sessionToken = $authJson['sessionToken'] ?? '';
-$status = $authJson['status'] ?? 'unknown';
-
-if ($authHttpCode >= 400 || $sessionToken === '') {
-    fwrite(STDERR, "Nie udało się pobrać sessionToken. HTTP: {$authHttpCode}, status: {$status}\n");
-    fwrite(STDERR, $authResponse . "\n");
-    exit(1);
+if ($stdout !== '') {
+    echo $stdout;
 }
-
-$separator = str_contains($authorizeUrl, '?') ? '&' : '?';
-$finalUrl = $authorizeUrl . $separator . 'sessionToken=' . rawurlencode((string) $sessionToken);
-
-$pageCh = curl_init($finalUrl);
-if ($pageCh === false) {
-    fwrite(STDERR, "Nie udało się zainicjalizować połączenia cURL dla pobrania strony.\n");
-    exit(1);
-}
-
-curl_setopt_array($pageCh, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_FOLLOWLOCATION => true,
-]);
-
-$pageHtml = curl_exec($pageCh);
-if ($pageHtml === false) {
-    fwrite(STDERR, 'Błąd cURL (pobieranie strony): ' . curl_error($pageCh) . "\n");
-    curl_close($pageCh);
-    exit(1);
-}
-
-$pageHttpCode = curl_getinfo($pageCh, CURLINFO_RESPONSE_CODE);
-curl_close($pageCh);
-
-if ($pageHttpCode >= 400) {
-    fwrite(STDERR, "Błąd HTTP przy pobieraniu strony: {$pageHttpCode}\n");
-    exit(1);
-}
-
-if (file_put_contents('okta_page.html', $pageHtml) === false) {
-    fwrite(STDERR, "Nie udało się zapisać pliku okta_page.html\n");
-    exit(1);
-}
-
-echo "Zapisano treść strony do: okta_page.html\n";
