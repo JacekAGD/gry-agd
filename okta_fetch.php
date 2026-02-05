@@ -132,6 +132,31 @@ const fs = require('fs');
 });
 JS;
 
+
+function resolveNodeBinary(): string
+{
+    $candidates = [
+        getenv('NODE_BIN') ?: '',
+        '/usr/bin/node',
+        '/usr/local/bin/node',
+        '/opt/homebrew/bin/node',
+        '/bin/node',
+    ];
+
+    $whichNode = @shell_exec('command -v node 2>/dev/null');
+    if (is_string($whichNode)) {
+        $candidates[] = trim($whichNode);
+    }
+
+    foreach (array_unique($candidates) as $candidate) {
+        if ($candidate !== '' && @is_executable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return '';
+}
+
 $tmpNode = tempnam(sys_get_temp_dir(), 'okta_node_');
 if ($tmpNode === false) {
     echo "Nie udało się utworzyć pliku tymczasowego.\n";
@@ -144,7 +169,14 @@ if (file_put_contents($tmpNode, $nodeScript) === false) {
     exit(1);
 }
 
-$cmd = 'node ' . escapeshellarg($tmpNode);
+$nodeBinary = resolveNodeBinary();
+if ($nodeBinary === '') {
+    echo "Nie znaleziono binarki Node.js. Ustaw NODE_BIN lub zainstaluj node w systemie.\n";
+    @unlink($tmpNode);
+    exit(1);
+}
+
+$cmd = escapeshellarg($nodeBinary) . ' ' . escapeshellarg($tmpNode);
 $descriptors = [
     0 => ['pipe', 'r'],
     1 => ['pipe', 'w'],
