@@ -14,6 +14,7 @@ if ($login === 'YOUR_LOGIN' || $pass === 'YOUR_PASSWORD') {
 $authorizeUrl = 'https://arcelik.okta-emea.com/oauth2/v1/authorize?client_id=okta.2b1959c8-bcc0-56eb-a589-cfcfb7422f26&code_challenge=PgpvH9uwEFyESRTVT_Z-F_kNXWsSBz8mdmP0hyk6RGY&code_challenge_method=S256&nonce=57cRjuEV5z48yL08QoutsjdMrHTuHUQxtFptaW9SAnH3746EkCiE2o275MjsNIcl&redirect_uri=https%3A%2F%2Farcelik.okta-emea.com%2Fenduser%2Fcallback&response_type=code&state=CTMr1LoHzERaECK8izTFb0YvFWvsBfGNWSsajxFWuyXAaNYfKsTxfBhDQ26RE7vG&scope=openid%20profile%20email%20okta.users.read.self%20okta.users.manage.self%20okta.internal.enduser.read%20okta.internal.enduser.manage%20okta.enduser.dashboard.read%20okta.enduser.dashboard.manage%20okta.myAccount.sessions.manage%20okta.internal.navigation.enduser.read';
 $apiUrl = 'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/27790/0/2025-11-14/2025-11-21/false/null';
 $outputFile = 'sirius_tasks_data.json';
+$appRoot = __DIR__;
 
 $nodeScript = <<<'JS'
 const fs = require('fs');
@@ -189,9 +190,10 @@ $env = array_merge($_ENV, [
     'OKTA_AUTHORIZE_URL' => $authorizeUrl,
     'SIRIUS_API_URL' => $apiUrl,
     'OKTA_OUTPUT_FILE' => $outputFile,
+    'NODE_PATH' => $appRoot . DIRECTORY_SEPARATOR . 'node_modules',
 ]);
 
-$process = proc_open($cmd, $descriptors, $pipes, null, $env);
+$process = proc_open($cmd, $descriptors, $pipes, $appRoot, $env);
 if (!is_resource($process)) {
     echo "Nie udało się uruchomić Node.js.\n";
     @unlink($tmpNode);
