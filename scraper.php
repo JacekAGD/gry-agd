@@ -160,10 +160,16 @@ $sessionCookieUrl = sprintf(
     rawurlencode($redirectUri)
 );
 
-http_request('GET', $sessionCookieUrl, [
+$sessionCookieResponse = http_request('GET', $sessionCookieUrl, [
     'User-Agent: ' . $userAgent,
     'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 ], null, true, $cookieJar);
+
+if (getenv('OKTA_DEBUG_LOGIN_BODY') === '1') {
+    echo "==== OKTA SESSION COOKIE RESPONSE BODY ====\n";
+    echo $sessionCookieResponse['body'] . "\n";
+    echo "==== END OKTA SESSION COOKIE RESPONSE BODY ====\n";
+}
 
 $authorizeUrl = sprintf(
     '%s/oauth2/v1/authorize?client_id=%s&code_challenge=%s&code_challenge_method=S256&nonce=%s&redirect_uri=%s&response_type=code&state=%s&scope=%s',
@@ -181,6 +187,12 @@ $authorizeResponse = http_request('GET', $authorizeUrl, [
     'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 ], null, true, $cookieJar);
 $code = parse_code_from_url($authorizeResponse['effective_url']);
+
+if (getenv('OKTA_DEBUG_LOGIN_BODY') === '1') {
+    echo "==== OKTA AUTHORIZE RESPONSE BODY ====\n";
+    echo $authorizeResponse['body'] . "\n";
+    echo "==== END OKTA AUTHORIZE RESPONSE BODY ====\n";
+}
 
 if (!$code) {
     $fallbackAuthorizeUrl = sprintf(
