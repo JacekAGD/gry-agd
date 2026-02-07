@@ -2,10 +2,10 @@
 
 dla zabawy
 
-## Okta web scraping (PHP)
+## Okta redirect flow (PHP)
 
-Skrypt `scraper.php` wykonuje logowanie do Okta przez Authn API, pobiera token OAuth2 (PKCE), a następnie uderza w endpoint:
-`https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/...`.
+Skrypt `scraper.php` wykonuje żądanie do podanego URL `authorize`, podąża za przekierowaniami i wyświetla wynik końcowy.
+Jeżeli w treści odpowiedzi pojawi się link do bookmarka Okta, skrypt otworzy go i wypisze wynik końcowy tego wywołania.
 
 ### Wymagania
 
@@ -13,37 +13,21 @@ Skrypt `scraper.php` wykonuje logowanie do Okta przez Authn API, pobiera token O
 
 ### Zmienne środowiskowe
 
-Ustaw poniższe zmienne (wymagane są `OKTA_USERNAME` i `OKTA_PASSWORD`):
-
 ```bash
-export OKTA_USERNAME="twoj_login"
-export OKTA_PASSWORD="twoje_haslo"
+# opcjonalnie (możesz podmienić URL authorize)
+export OKTA_AUTHORIZE_URL="https://arcelik.okta-emea.com/oauth2/v1/authorize?..."
 
 # opcjonalnie
-export OKTA_CLIENT_ID="okta.2b1959c8-bcc0-56eb-a589-cfcfb7422f26"
-export OKTA_REDIRECT_URI="https://arcelik.okta-emea.com/enduser/callback"
-export OKTA_SCOPE="openid profile email okta.users.read.self okta.users.manage.self okta.internal.enduser.read okta.internal.enduser.manage okta.enduser.dashboard.read okta.enduser.dashboard.manage okta.myAccount.sessions.manage okta.internal.navigation.enduser.read"
-export OKTA_DOMAIN="https://arcelik.okta-emea.com"
 export OKTA_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 ```
 
 ### Uruchomienie
 
 ```bash
-php scraper.php \
-  --task-id=27790 \
-  --offset=0 \
-  --from=2025-11-14 \
-  --to=2025-11-21 \
-  --include-archived=false
+php scraper.php
 ```
-
-Parametry CLI są opcjonalne (domyślne wartości odpowiadają temu, co podałeś w linku).
 
 ### Uwagi
 
-- Jeśli konto ma MFA lub inne wymagania, Authn API może zwrócić `MFA_REQUIRED` albo inną flagę i skrypt zakończy się komunikatem.
-- W takim przypadku trzeba dodać obsługę MFA lub użyć innego flow (np. tokeny serwisowe).
-- Skrypt używa `sessionCookieRedirect`, żeby ustawić cookie sesji Okta podobnie do przepływu w przeglądarce, a potem wykonuje `authorize`.
-- Gdy w treści odpowiedzi pojawi się link do bookmarka Okta `https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557`, skrypt automatycznie go otworzy i podąży za przekierowaniami.
-- Skrypt wypisuje tylko wynik końcowy wywołania bookmarka Okta po wszystkich przekierowaniach.
+- Skrypt tylko podąża za przekierowaniami i wypisuje wynik końcowy. Nie zapisuje ani nie używa loginu/hasła.
+- Jeżeli w odpowiedzi pojawi się link do bookmarka Okta `https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557`, skrypt wywoła go i wyświetli wynik po przekierowaniach.
