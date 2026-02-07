@@ -2,9 +2,9 @@
 
 dla zabawy
 
-## Sirius Partner redirect flow (PHP)
+## Okta authorize redirect flow (PHP)
 
-Skrypt `scraper.php` wykonuje żądanie do strony `https://sirius-partner.beko.com/overview`,
+Skrypt `scraper.php` wykonuje żądanie do podanego URL `authorize`,
 podąża za przekierowaniami i wyświetla wynik końcowy (po wszystkich redirectach).
 
 ### Wymagania
@@ -14,8 +14,8 @@ podąża za przekierowaniami i wyświetla wynik końcowy (po wszystkich redirect
 ### Zmienne środowiskowe
 
 ```bash
-# opcjonalnie (możesz podmienić URL startowy)
-export SIRIUS_OVERVIEW_URL="https://sirius-partner.beko.com/overview"
+# opcjonalnie (możesz podmienić URL authorize)
+export OKTA_AUTHORIZE_URL="https://arcelik.okta-emea.com/oauth2/aus35952jwgf7NWvK0i7/v1/authorize?..."
 
 # opcjonalnie
 export OKTA_USER_AGENT="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

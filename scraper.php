@@ -72,7 +72,7 @@ function output_response(array $response, string $requestUrl, string $method): v
     echo "==== END HTTP RESPONSE ====" . "\n";
 }
 
-$startUrl = getenv('SIRIUS_OVERVIEW_URL') ?: 'https://sirius-partner.beko.com/overview';
+$startUrl = getenv('OKTA_AUTHORIZE_URL') ?: 'https://arcelik.okta-emea.com/oauth2/aus35952jwgf7NWvK0i7/v1/authorize?client_id=0oa6se8rteQZlhlY40i7&code_challenge=h3XYiKGPr5NMciaGAlaMvcxGYP5vEVWTmzm40mJH-nU&code_challenge_method=S256&nonce=jLkVI94EIBZFe8oWSxHOOcFCA8dx798YadUMccvZ3H33vzBpzlaGWM1IHrQTrQxB&redirect_uri=https%3A%2F%2Fsirius-partner.beko.com%2Fimplicit%2Fcallback&response_type=code&state=8SvQftecRhZ7JEZ8ZAb1avzVMvJaAa9t7UR4VIN7fo99MagQ9bJp0ZIdn3ClJ5vv&scope=openid%20email%20profile';
 $userAgent = getenv('OKTA_USER_AGENT') ?: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 $cookieJar = sys_get_temp_dir() . '/okta_cookie_' . bin2hex(random_bytes(8)) . '.txt';
 
