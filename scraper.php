@@ -76,6 +76,23 @@ function http_request(
     echo $bodyText . "\n";
     echo "==== END HTTP RESPONSE ====\n";
 
+    $bookmarkUrl = $GLOBALS['OKTA_BOOKMARK_URL'] ?? null;
+    $userAgent = $GLOBALS['OKTA_USER_AGENT'] ?? null;
+    static $bookmarkOpened = false;
+    if (
+        !$bookmarkOpened
+        && $bookmarkUrl
+        && $bodyText !== ''
+        && strpos($bodyText, $bookmarkUrl) !== false
+        && $url !== $bookmarkUrl
+    ) {
+        $bookmarkOpened = true;
+        http_request('GET', $bookmarkUrl, [
+            'User-Agent: ' . ($userAgent ?: 'Mozilla/5.0'),
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        ], null, true, $cookieJar);
+    }
+
     return [
         'status' => $status,
         'headers' => $headerText,
@@ -120,6 +137,9 @@ $oktaDomain = getenv('OKTA_DOMAIN') ?: 'https://arcelik.okta-emea.com';
 $username = getenv('OKTA_USERNAME');
 $password = getenv('OKTA_PASSWORD');
 $userAgent = getenv('OKTA_USER_AGENT') ?: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+$bookmarkUrl = $oktaDomain . '/home/bookmark/0oagda9obfeM9qqGs0i7/2557';
+$GLOBALS['OKTA_USER_AGENT'] = $userAgent;
+$GLOBALS['OKTA_BOOKMARK_URL'] = $bookmarkUrl;
 
 if (!$username || !$password) {
     echo "Missing OKTA_USERNAME or OKTA_PASSWORD environment variables.\n";
@@ -251,11 +271,6 @@ if (!is_array($tokenData) || empty($tokenData['access_token'])) {
 }
 
 $accessToken = $tokenData['access_token'];
-$bookmarkUrl = $oktaDomain . '/home/bookmark/0oagda9obfeM9qqGs0i7/2557';
-http_request('GET', $bookmarkUrl, [
-    'User-Agent: ' . $userAgent,
-    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-], null, true, $cookieJar);
 
 $apiUrl = sprintf(
     'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/%s/%s/%s/%s/%s/null',
