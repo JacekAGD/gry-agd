@@ -66,6 +66,16 @@ function http_request(
     $headerText = substr($response, 0, $headerSize);
     $bodyText = substr($response, $headerSize);
 
+    echo "==== HTTP RESPONSE ====\n";
+    echo "REQUEST: " . strtoupper($method) . " " . $url . "\n";
+    echo "STATUS: {$status}\n";
+    echo "EFFECTIVE URL: {$effectiveUrl}\n";
+    echo "---- HEADERS ----\n";
+    echo trim($headerText) . "\n";
+    echo "---- BODY ----\n";
+    echo $bodyText . "\n";
+    echo "==== END HTTP RESPONSE ====\n";
+
     return [
         'status' => $status,
         'headers' => $headerText,

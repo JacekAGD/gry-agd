@@ -48,3 +48,4 @@ Parametry CLI są opcjonalne (domyślne wartości odpowiadają temu, co podałe�
 - Skrypt używa `sessionCookieRedirect`, żeby ustawić cookie sesji Okta podobnie do przepływu w przeglądarce, a potem wykonuje `authorize`.
 - Po uzyskaniu tokenu skrypt otwiera bookmark Okta `https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557`, aby ustawić kontekst sesji przed wywołaniem API.
 - Jeśli ustawisz `OKTA_DEBUG_LOGIN_BODY=1`, skrypt wypisze treść HTML odpowiedzi z logowania (sessionCookieRedirect i authorize).
+- Skrypt wypisuje wszystkie odpowiedzi HTTP (status, nagłówki i body) dla każdego wysyłanego żądania.
