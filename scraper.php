@@ -23,7 +23,8 @@ function http_request(
     array $headers = [],
     ?string $body = null,
     bool $followRedirects = true,
-    ?string $cookieJar = null
+    ?string $cookieJar = null,
+    bool $logResponse = false
 ): array {
     $ch = curl_init();
     $options = [
@@ -66,15 +67,17 @@ function http_request(
     $headerText = substr($response, 0, $headerSize);
     $bodyText = substr($response, $headerSize);
 
-    echo "==== HTTP RESPONSE ====\n";
-    echo "REQUEST: " . strtoupper($method) . " " . $url . "\n";
-    echo "STATUS: {$status}\n";
-    echo "EFFECTIVE URL: {$effectiveUrl}\n";
-    echo "---- HEADERS ----\n";
-    echo trim($headerText) . "\n";
-    echo "---- BODY ----\n";
-    echo $bodyText . "\n";
-    echo "==== END HTTP RESPONSE ====\n";
+    if ($logResponse) {
+        echo "==== HTTP RESPONSE ====\n";
+        echo "REQUEST: " . strtoupper($method) . " " . $url . "\n";
+        echo "STATUS: {$status}\n";
+        echo "EFFECTIVE URL: {$effectiveUrl}\n";
+        echo "---- HEADERS ----\n";
+        echo trim($headerText) . "\n";
+        echo "---- BODY ----\n";
+        echo $bodyText . "\n";
+        echo "==== END HTTP RESPONSE ====\n";
+    }
 
     $bookmarkUrl = $GLOBALS['OKTA_BOOKMARK_URL'] ?? null;
     $userAgent = $GLOBALS['OKTA_USER_AGENT'] ?? null;
@@ -90,7 +93,7 @@ function http_request(
         http_request('GET', $bookmarkUrl, [
             'User-Agent: ' . ($userAgent ?: 'Mozilla/5.0'),
             'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        ], null, true, $cookieJar);
+        ], null, true, $cookieJar, true);
     }
 
     return [
@@ -110,7 +113,7 @@ function json_request(
 ): array
 {
     $headers[] = 'Content-Type: application/json';
-    $response = http_request($method, $url, $headers, json_encode($payload), true, $cookieJar);
+    $response = http_request($method, $url, $headers, json_encode($payload), true, $cookieJar, false);
     $data = json_decode($response['body'], true);
 
     if (!is_array($data)) {
@@ -193,13 +196,7 @@ $sessionCookieUrl = sprintf(
 $sessionCookieResponse = http_request('GET', $sessionCookieUrl, [
     'User-Agent: ' . $userAgent,
     'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-], null, true, $cookieJar);
-
-if (getenv('OKTA_DEBUG_LOGIN_BODY') === '1') {
-    echo "==== OKTA SESSION COOKIE RESPONSE BODY ====\n";
-    echo $sessionCookieResponse['body'] . "\n";
-    echo "==== END OKTA SESSION COOKIE RESPONSE BODY ====\n";
-}
+], null, true, $cookieJar, false);
 
 $authorizeUrl = sprintf(
     '%s/oauth2/v1/authorize?client_id=%s&code_challenge=%s&code_challenge_method=S256&nonce=%s&redirect_uri=%s&response_type=code&state=%s&scope=%s',
@@ -215,14 +212,8 @@ $authorizeUrl = sprintf(
 $authorizeResponse = http_request('GET', $authorizeUrl, [
     'User-Agent: ' . $userAgent,
     'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-], null, true, $cookieJar);
+], null, true, $cookieJar, false);
 $code = parse_code_from_url($authorizeResponse['effective_url']);
-
-if (getenv('OKTA_DEBUG_LOGIN_BODY') === '1') {
-    echo "==== OKTA AUTHORIZE RESPONSE BODY ====\n";
-    echo $authorizeResponse['body'] . "\n";
-    echo "==== END OKTA AUTHORIZE RESPONSE BODY ====\n";
-}
 
 if (!$code) {
     $fallbackAuthorizeUrl = sprintf(
@@ -240,7 +231,7 @@ if (!$code) {
     $authorizeResponse = http_request('GET', $fallbackAuthorizeUrl, [
         'User-Agent: ' . $userAgent,
         'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    ], null, true, $cookieJar);
+    ], null, true, $cookieJar, false);
     $code = parse_code_from_url($authorizeResponse['effective_url']);
 }
 
@@ -261,7 +252,7 @@ $tokenBody = http_build_query([
 $tokenResponse = http_request('POST', $tokenUrl, [
     'Content-Type: application/x-www-form-urlencoded',
     'User-Agent: ' . $userAgent,
-], $tokenBody, false, $cookieJar);
+], $tokenBody, false, $cookieJar, false);
 $tokenData = json_decode($tokenResponse['body'], true);
 
 if (!is_array($tokenData) || empty($tokenData['access_token'])) {
@@ -285,7 +276,7 @@ $apiResponse = http_request('GET', $apiUrl, [
     'Authorization: Bearer ' . $accessToken,
     'Accept: application/json',
     'User-Agent: ' . $userAgent,
-], null, false, $cookieJar);
+], null, false, $cookieJar, false);
 
 if ($apiResponse['status'] < 200 || $apiResponse['status'] >= 300) {
     echo "API request failed with status {$apiResponse['status']}.\n";
