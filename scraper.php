@@ -229,6 +229,12 @@ if (!is_array($tokenData) || empty($tokenData['access_token'])) {
 }
 
 $accessToken = $tokenData['access_token'];
+$bookmarkUrl = $oktaDomain . '/home/bookmark/0oagda9obfeM9qqGs0i7/2557';
+http_request('GET', $bookmarkUrl, [
+    'User-Agent: ' . $userAgent,
+    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+], null, true, $cookieJar);
+
 $apiUrl = sprintf(
     'https://sirius-api.beko.com/Api/Technician/GetTasksDataDetail/%s/%s/%s/%s/%s/null',
     rawurlencode($taskId),

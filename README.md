@@ -45,3 +45,4 @@ Parametry CLI są opcjonalne (domyślne wartości odpowiadają temu, co podałe�
 - Jeśli konto ma MFA lub inne wymagania, Authn API może zwrócić `MFA_REQUIRED` albo inną flagę i skrypt zakończy się komunikatem.
 - W takim przypadku trzeba dodać obsługę MFA lub użyć innego flow (np. tokeny serwisowe).
 - Skrypt używa `sessionCookieRedirect`, żeby ustawić cookie sesji Okta podobnie do przepływu w przeglądarce, a potem wykonuje `authorize`.
+- Po uzyskaniu tokenu skrypt otwiera bookmark Okta `https://arcelik.okta-emea.com/home/bookmark/0oagda9obfeM9qqGs0i7/2557`, aby ustawić kontekst sesji przed wywołaniem API.
