@@ -99,7 +99,7 @@ $username = getenv('OKTA_USERNAME');
 $password = getenv('OKTA_PASSWORD');
 
 if (!$username || !$password) {
-    fwrite(STDERR, "Missing OKTA_USERNAME or OKTA_PASSWORD environment variables.\n");
+    echo "Missing OKTA_USERNAME or OKTA_PASSWORD environment variables.\n";
     exit(1);
 }
 
@@ -123,16 +123,16 @@ $authnResponse = json_request('POST', $authnUrl, [
 
 if (($authnResponse['status'] ?? '') !== 'SUCCESS') {
     $status = $authnResponse['status'] ?? 'UNKNOWN';
-    fwrite(STDERR, "Okta authentication failed with status: {$status}.\n");
+    echo "Okta authentication failed with status: {$status}.\n";
     if (isset($authnResponse['_embedded'])) {
-        fwrite(STDERR, "Additional details: " . json_encode($authnResponse['_embedded']) . "\n");
+        echo "Additional details: " . json_encode($authnResponse['_embedded']) . "\n";
     }
     exit(1);
 }
 
 $sessionToken = $authnResponse['sessionToken'] ?? null;
 if (!$sessionToken) {
-    fwrite(STDERR, "Missing sessionToken from Okta response.\n");
+    echo "Missing sessionToken from Okta response.\n";
     exit(1);
 }
 
@@ -152,7 +152,7 @@ $authorizeResponse = http_request('GET', $authorizeUrl, [], null, true);
 $code = parse_code_from_url($authorizeResponse['effective_url']);
 
 if (!$code) {
-    fwrite(STDERR, "Authorization code not found in redirect URL.\n");
+    echo "Authorization code not found in redirect URL.\n";
     exit(1);
 }
 
@@ -169,8 +169,8 @@ $tokenResponse = http_request('POST', $tokenUrl, ['Content-Type: application/x-w
 $tokenData = json_decode($tokenResponse['body'], true);
 
 if (!is_array($tokenData) || empty($tokenData['access_token'])) {
-    fwrite(STDERR, "Failed to retrieve access token.\n");
-    fwrite(STDERR, $tokenResponse['body'] . "\n");
+    echo "Failed to retrieve access token.\n";
+    echo $tokenResponse['body'] . "\n";
     exit(1);
 }
 
@@ -190,8 +190,8 @@ $apiResponse = http_request('GET', $apiUrl, [
 ], null, false);
 
 if ($apiResponse['status'] < 200 || $apiResponse['status'] >= 300) {
-    fwrite(STDERR, "API request failed with status {$apiResponse['status']}.\n");
-    fwrite(STDERR, $apiResponse['body'] . "\n");
+    echo "API request failed with status {$apiResponse['status']}.\n";
+    echo $apiResponse['body'] . "\n";
     exit(1);
 }
 
