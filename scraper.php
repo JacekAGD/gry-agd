@@ -22,7 +22,8 @@ function http_request(
     string $url,
     array $headers = [],
     ?string $body = null,
-    bool $followRedirects = true
+    bool $followRedirects = true,
+    ?string $cookieJar = null
 ): array {
     $ch = curl_init();
     $options = [
@@ -41,6 +42,11 @@ function http_request(
 
     if ($body !== null) {
         $options[CURLOPT_POSTFIELDS] = $body;
+    }
+
+    if ($cookieJar !== null) {
+        $options[CURLOPT_COOKIEJAR] = $cookieJar;
+        $options[CURLOPT_COOKIEFILE] = $cookieJar;
     }
 
     curl_setopt_array($ch, $options);
@@ -68,10 +74,16 @@ function http_request(
     ];
 }
 
-function json_request(string $method, string $url, array $payload, array $headers = []): array
+function json_request(
+    string $method,
+    string $url,
+    array $payload,
+    array $headers = [],
+    ?string $cookieJar = null
+): array
 {
     $headers[] = 'Content-Type: application/json';
-    $response = http_request($method, $url, $headers, json_encode($payload));
+    $response = http_request($method, $url, $headers, json_encode($payload), true, $cookieJar);
     $data = json_decode($response['body'], true);
 
     if (!is_array($data)) {
@@ -97,6 +109,7 @@ $scope = getenv('OKTA_SCOPE') ?: 'openid profile email okta.users.read.self okta
 $oktaDomain = getenv('OKTA_DOMAIN') ?: 'https://arcelik.okta-emea.com';
 $username = getenv('OKTA_USERNAME');
 $password = getenv('OKTA_PASSWORD');
+$userAgent = getenv('OKTA_USER_AGENT') ?: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 if (!$username || !$password) {
     echo "Missing OKTA_USERNAME or OKTA_PASSWORD environment variables.\n";
@@ -116,10 +129,14 @@ $state = base64url_encode(random_bytes(16));
 $nonce = base64url_encode(random_bytes(16));
 
 $authnUrl = $oktaDomain . '/api/v1/authn';
+$cookieJar = sys_get_temp_dir() . '/okta_cookie_' . bin2hex(random_bytes(8)) . '.txt';
 $authnResponse = json_request('POST', $authnUrl, [
     'username' => $username,
     'password' => $password,
-]);
+], [
+    'Accept: application/json',
+    'User-Agent: ' . $userAgent,
+], $cookieJar);
 
 if (($authnResponse['status'] ?? '') !== 'SUCCESS') {
     $status = $authnResponse['status'] ?? 'UNKNOWN';
@@ -136,20 +153,54 @@ if (!$sessionToken) {
     exit(1);
 }
 
+$sessionCookieUrl = sprintf(
+    '%s/login/sessionCookieRedirect?token=%s&redirectUrl=%s',
+    $oktaDomain,
+    rawurlencode($sessionToken),
+    rawurlencode($redirectUri)
+);
+
+http_request('GET', $sessionCookieUrl, [
+    'User-Agent: ' . $userAgent,
+    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+], null, true, $cookieJar);
+
 $authorizeUrl = sprintf(
-    '%s/oauth2/v1/authorize?client_id=%s&code_challenge=%s&code_challenge_method=S256&nonce=%s&redirect_uri=%s&response_type=code&state=%s&scope=%s&sessionToken=%s',
+    '%s/oauth2/v1/authorize?client_id=%s&code_challenge=%s&code_challenge_method=S256&nonce=%s&redirect_uri=%s&response_type=code&state=%s&scope=%s',
     $oktaDomain,
     rawurlencode($clientId),
     rawurlencode($challenge),
     rawurlencode($nonce),
     rawurlencode($redirectUri),
     rawurlencode($state),
-    rawurlencode($scope),
-    rawurlencode($sessionToken)
+    rawurlencode($scope)
 );
 
-$authorizeResponse = http_request('GET', $authorizeUrl, [], null, true);
+$authorizeResponse = http_request('GET', $authorizeUrl, [
+    'User-Agent: ' . $userAgent,
+    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+], null, true, $cookieJar);
 $code = parse_code_from_url($authorizeResponse['effective_url']);
+
+if (!$code) {
+    $fallbackAuthorizeUrl = sprintf(
+        '%s/oauth2/v1/authorize?client_id=%s&code_challenge=%s&code_challenge_method=S256&nonce=%s&redirect_uri=%s&response_type=code&state=%s&scope=%s&sessionToken=%s',
+        $oktaDomain,
+        rawurlencode($clientId),
+        rawurlencode($challenge),
+        rawurlencode($nonce),
+        rawurlencode($redirectUri),
+        rawurlencode($state),
+        rawurlencode($scope),
+        rawurlencode($sessionToken)
+    );
+
+    $authorizeResponse = http_request('GET', $fallbackAuthorizeUrl, [
+        'User-Agent: ' . $userAgent,
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    ], null, true, $cookieJar);
+    $code = parse_code_from_url($authorizeResponse['effective_url']);
+}
 
 if (!$code) {
     echo "Authorization code not found in redirect URL.\n";
@@ -165,7 +216,10 @@ $tokenBody = http_build_query([
     'code' => $code,
 ]);
 
-$tokenResponse = http_request('POST', $tokenUrl, ['Content-Type: application/x-www-form-urlencoded'], $tokenBody, false);
+$tokenResponse = http_request('POST', $tokenUrl, [
+    'Content-Type: application/x-www-form-urlencoded',
+    'User-Agent: ' . $userAgent,
+], $tokenBody, false, $cookieJar);
 $tokenData = json_decode($tokenResponse['body'], true);
 
 if (!is_array($tokenData) || empty($tokenData['access_token'])) {
@@ -187,7 +241,8 @@ $apiUrl = sprintf(
 $apiResponse = http_request('GET', $apiUrl, [
     'Authorization: Bearer ' . $accessToken,
     'Accept: application/json',
-], null, false);
+    'User-Agent: ' . $userAgent,
+], null, false, $cookieJar);
 
 if ($apiResponse['status'] < 200 || $apiResponse['status'] >= 300) {
     echo "API request failed with status {$apiResponse['status']}.\n";
